@@ -1130,7 +1130,7 @@ static int mmc_select_hs_ddr(struct mmc_card *card)
 			ext_csd_bits,
 			card->ext_csd.generic_cmd6_time);
 	if (err) {
-		pr_warn("%s: switch to bus width %d ddr failed\n",
+		pr_err("%s: switch to bus width %d ddr failed\n",
 			mmc_hostname(host), 1 << bus_width);
 		return err;
 	}
@@ -1208,49 +1208,30 @@ static int mmc_select_hs400(struct mmc_card *card)
 			   EXT_CSD_TIMING_HS400 | host->device_drv,
 			   card->ext_csd.generic_cmd6_time,
 			   true, true, true);
-		if (err) {
-			pr_warn("%s: switch to hs400 failed, err:%d\n",
-				mmc_hostname(host), err);
-			return err;
-		}
-		mmc_set_timing(host, MMC_TIMING_MMC_HS400_ES);
-	} else {
-		/*
-		 * Before switching to dual data rate operation for HS400,
-		 * it is required to convert from HS200 mode to HS mode.
-		 */
-		err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-				   EXT_CSD_HS_TIMING, EXT_CSD_TIMING_HS,
-				   card->ext_csd.generic_cmd6_time,
-				   true, true, true);
-		if (err) {
-			pr_warn("%s: switch to high-speed from hs200 failed, err:%d\n",
-				mmc_hostname(host), err);
-			return err;
-		}
-		mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
-		mmc_set_bus_speed(card);
+	if (err) {
+		pr_err("%s: switch to high-speed from hs200 failed, err:%d\n",
+			mmc_hostname(host), err);
+		return err;
+	}
 
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			 EXT_CSD_BUS_WIDTH,
 			 EXT_CSD_DDR_BUS_WIDTH_8,
 			 card->ext_csd.generic_cmd6_time);
-		if (err) {
-			pr_warn("%s: switch to bus width for hs400 failed, err:%d\n",
-				mmc_hostname(host), err);
-			return err;
-		}
-		err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-			   EXT_CSD_HS_TIMING,
-			   EXT_CSD_TIMING_HS400 | host->device_drv,
+	if (err) {
+		pr_err("%s: switch to bus width for hs400 failed, err:%d\n",
+			mmc_hostname(host), err);
+		return err;
+	}
+
+	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			   EXT_CSD_HS_TIMING, EXT_CSD_TIMING_HS400,
 			   card->ext_csd.generic_cmd6_time,
 			   true, true, true);
-		if (err) {
-			pr_warn("%s: switch to hs400 failed, err:%d\n",
-				mmc_hostname(host), err);
-			return err;
-		}
-		mmc_set_timing(host, MMC_TIMING_MMC_HS400);
+	if (err) {
+		pr_err("%s: switch to hs400 failed, err:%d\n",
+			 mmc_hostname(host), err);
+		return err;
 	}
 	mmc_set_bus_speed(card);
 	return 0;
@@ -1392,7 +1373,7 @@ static int mmc_hs200_tuning(struct mmc_card *card)
 		mmc_host_clk_release(host);
 
 		if (err)
-			pr_warn("%s: tuning execution failed\n",
+			pr_err("%s: tuning execution failed\n",
 				mmc_hostname(host));
 	}
 
@@ -1645,18 +1626,18 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	} else if (mmc_card_hs200(card)) {
 		err = mmc_hs200_tuning(card);
 		if (err)
-			goto err;
+			goto free_card;
 
 		err = mmc_select_hs400(card);
 		if (err)
-			goto err;
+			goto free_card;
 	} else if (mmc_card_hs(card)) {
 		/* Select the desired bus width optionally */
 		err = mmc_select_bus_width(card);
 		if (!IS_ERR_VALUE(err)) {
 			err = mmc_select_hs_ddr(card);
 			if (err)
-				goto err;
+				goto free_card;
 		}
 	}
 

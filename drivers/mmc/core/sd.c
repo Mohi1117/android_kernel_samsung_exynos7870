@@ -660,31 +660,10 @@ static int mmc_sd_init_uhs_card(struct mmc_card *card)
 	 * SPI mode doesn't define CMD19 and tuning is only valid for SDR50 and
 	 * SDR104 mode SD-cards. Note that tuning is mandatory for SDR104.
 	 */
-	if (!mmc_host_is_spi(card->host) && card->host->ops->execute_tuning &&
-			(card->sd_bus_speed == UHS_SDR50_BUS_SPEED ||
-			 card->sd_bus_speed == UHS_SDR104_BUS_SPEED)) {
-		if (card->raw_cid[0] == abnormal_sd_cid0
-				&& card->raw_cid[1] == abnormal_sd_cid1) {
-			pr_warn("%s: abnormal mmc card(cid = %x%x)\n",
-					mmc_hostname(card->host),
-					abnormal_sd_cid0, abnormal_sd_cid1);
-
-			if (card->sw_caps.uhs_max_dtr == UHS_SDR104_MAX_DTR)
-				card->sw_caps.uhs_max_dtr = UHS_SDR50_MAX_DTR;
-			else if (card->sw_caps.uhs_max_dtr == UHS_SDR50_MAX_DTR)
-				card->sw_caps.uhs_max_dtr = UHS_SDR25_MAX_DTR;
-			else if (card->sw_caps.uhs_max_dtr == UHS_SDR25_MAX_DTR)
-				card->sw_caps.uhs_max_dtr = UHS_SDR12_MAX_DTR;
-
-			mmc_set_clock(card->host, card->sw_caps.uhs_max_dtr);
-		}
-
-		mmc_host_clk_hold(card->host);
-		err = card->host->ops->execute_tuning(card->host,
-						      MMC_SEND_TUNING_BLOCK);
-		mmc_host_clk_release(card->host);
-	}
-
+	if (!mmc_host_is_spi(card->host) &&
+	    (card->sd_bus_speed == UHS_SDR50_BUS_SPEED ||
+	     card->sd_bus_speed == UHS_SDR104_BUS_SPEED))
+		err = mmc_execute_tuning(card);
 out:
 	kfree(status);
 

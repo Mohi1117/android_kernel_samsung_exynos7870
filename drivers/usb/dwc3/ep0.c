@@ -966,8 +966,8 @@ static void __dwc3_ep0_do_control_data(struct dwc3 *dwc,
 		u32	transfer_size;
 		u32	maxpacket;
 
-		WARN_ON(req->request.length > DWC3_EP0_BOUNCE_SIZE);
-
+			return;
+		}
 		maxpacket = dep->endpoint.maxpacket;
 		transfer_size = roundup(req->request.length, maxpacket);
 

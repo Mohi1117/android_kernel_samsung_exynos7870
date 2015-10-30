@@ -37,6 +37,7 @@
 #include <linux/of.h>
 #include <net/netlink.h>
 #include <net/genetlink.h>
+#include <linux/suspend.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/thermal.h>
@@ -59,14 +60,7 @@ static LIST_HEAD(thermal_governor_list);
 static DEFINE_MUTEX(thermal_list_lock);
 static DEFINE_MUTEX(thermal_governor_lock);
 
-#ifdef CONFIG_SCHED_MC
-#define BOUNDED_CPU		1
-static void start_poll_queue(struct thermal_zone_device *tz, int delay)
-{
-	mod_delayed_work_on(tz->poll_queue_cpu, system_freezable_wq, &tz->poll_queue,
-			msecs_to_jiffies(delay));
-}
-#endif
+static atomic_t in_suspend;
 
 static struct thermal_governor *def_governor;
 
@@ -507,6 +501,9 @@ static void thermal_zone_device_reset(struct thermal_zone_device *tz)
 void thermal_zone_device_update(struct thermal_zone_device *tz)
 {
 	int count;
+
+	if (atomic_read(&in_suspend))
+		return;
 
 	if (!tz->ops->get_temp)
 		return;
@@ -1881,39 +1878,35 @@ static void thermal_unregister_governors(void)
 	thermal_gov_user_space_unregister();
 }
 
-#ifdef CONFIG_SCHED_MC
-static int __cpuinit thermal_cpu_callback(struct notifier_block *nfb,
-					unsigned long action, void *hcpu)
+static int thermal_pm_notify(struct notifier_block *nb,
+				unsigned long mode, void *_unused)
 {
-	unsigned int cpu = (unsigned long)hcpu;
-	struct thermal_zone_device *pos;
+	struct thermal_zone_device *tz;
 
-	switch (action) {
-	case CPU_ONLINE:
-		if (cpu == BOUNDED_CPU) {
-			list_for_each_entry(pos, &thermal_tz_list, node) {
-				pos->poll_queue_cpu = BOUNDED_CPU;
-				start_poll_queue(pos, pos->polling_delay);
-			}
+	switch (mode) {
+	case PM_HIBERNATION_PREPARE:
+	case PM_RESTORE_PREPARE:
+	case PM_SUSPEND_PREPARE:
+		atomic_set(&in_suspend, 1);
+		break;
+	case PM_POST_HIBERNATION:
+	case PM_POST_RESTORE:
+	case PM_POST_SUSPEND:
+		atomic_set(&in_suspend, 0);
+		list_for_each_entry(tz, &thermal_tz_list, node) {
+			thermal_zone_device_reset(tz);
+			thermal_zone_device_update(tz);
 		}
 		break;
-	case CPU_DOWN_PREPARE:
-		list_for_each_entry(pos, &thermal_tz_list, node) {
-			if (pos->poll_queue_cpu == cpu) {
-				pos->poll_queue_cpu = 0;
-				start_poll_queue(pos, pos->polling_delay);
-			}
-		}
+	default:
 		break;
 	}
-	return NOTIFY_OK;
+	return 0;
 }
 
-static struct notifier_block __cpuinitdata thermal_cpu_notifier =
-{
-	.notifier_call = thermal_cpu_callback,
+static struct notifier_block thermal_pm_nb = {
+	.notifier_call = thermal_pm_notify,
 };
-#endif
 
 static int __init thermal_init(void)
 {
@@ -1935,9 +1928,10 @@ static int __init thermal_init(void)
 	if (result)
 		goto exit_netlink;
 
-#ifdef CONFIG_SCHED_MC
-	register_hotcpu_notifier(&thermal_cpu_notifier);
-#endif
+	result = register_pm_notifier(&thermal_pm_nb);
+	if (result)
+		pr_warn("Thermal: Can not register suspend notifier, return %d\n",
+			result);
 
 	return 0;
 
@@ -1958,6 +1952,7 @@ error:
 
 static void __exit thermal_exit(void)
 {
+	unregister_pm_notifier(&thermal_pm_nb);
 	of_thermal_destroy_zones();
 	genetlink_exit();
 	class_unregister(&thermal_class);

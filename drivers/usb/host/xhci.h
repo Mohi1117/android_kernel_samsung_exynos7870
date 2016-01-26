@@ -1574,6 +1574,7 @@ struct xhci_hcd {
 #define XHCI_PME_STUCK_QUIRK	(1 << 20)
 /* For enabling USB2.0 L1 mode */
 #define XHCI_LPM_L1_SUPPORT	(1 << 25)
+#define XHCI_SSIC_PORT_UNUSED	(1 << 22)
 	unsigned int		num_active_eps;
 	unsigned int		limit_active_eps;
 	/* There are two roothubs to keep track of bus suspend info for */

@@ -2190,9 +2190,11 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 		dep->flags &= ~DWC3_EP_MISSED_ISOC;
 		return 1;
 	}
-	if (usb_endpoint_xfer_isoc(dep->endpoint.desc) && (event->status & DEPEVT_STATUS_IOC) &&
-			(trb->ctrl & DWC3_TRB_CTRL_IOC))
-		return 0;
+
+	if (usb_endpoint_xfer_isoc(dep->endpoint.desc))
+		if ((event->status & DEPEVT_STATUS_IOC) &&
+				(trb->ctrl & DWC3_TRB_CTRL_IOC))
+			return 0;
 	return 1;
 }
 

@@ -224,15 +224,7 @@ static int propagate_one(struct mount *m)
 		bool done;
 		for (n = m; ; n = p) {
 			p = n->mnt_master;
-			if (p == dest_master || IS_MNT_MARKED(p)) {
-				while (last_dest->mnt_master != p) {
-					last_source = last_source->mnt_master;
-					last_dest = last_source->mnt_parent;
-				}
-				if (!peers(n, last_dest)) {
-					last_source = last_source->mnt_master;
-					last_dest = last_source->mnt_parent;
-				}
+			if (p == dest_master || IS_MNT_MARKED(p))
 				break;
 		}
 		do {

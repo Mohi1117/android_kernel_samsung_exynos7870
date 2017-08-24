@@ -212,4 +212,5 @@ source "drivers/gps/Kconfig"
 
 source "drivers/sensorhub/stm32/Kconfig"
 
+source "drivers/android/Kconfig"
 endmenu

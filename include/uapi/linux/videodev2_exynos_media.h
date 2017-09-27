@@ -48,6 +48,15 @@
 /* 1 plane -- 8bit Y, 2bit Y, 8bit Cb + Cr interleaved, 2bit Cb + Cr interleaved, non contiguous */
 #define V4L2_PIX_FMT_NV12N_10B		v4l2_fourcc('B', 'N', '1', '2')
 
+/* yuv444 of JFIF JPEG */
+#define V4L2_PIX_FMT_JPEG_444 v4l2_fourcc('J', 'P', 'G', '4')
+/* yuv422 of JFIF JPEG */
+#define V4L2_PIX_FMT_JPEG_422 v4l2_fourcc('J', 'P', 'G', '2')
+/* yuv420 of JFIF JPEG */
+#define V4L2_PIX_FMT_JPEG_420 v4l2_fourcc('J', 'P', 'G', '0')
+/* grey of JFIF JPEG */
+#define V4L2_PIX_FMT_JPEG_GRAY v4l2_fourcc('J', 'P', 'G', 'G')
+
 /* helper macros */
 #ifndef __ALIGN_UP
 #define __ALIGN_UP(x, a)		(((x) + ((a) - 1)) & ~((a) - 1))

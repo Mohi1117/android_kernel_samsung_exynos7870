@@ -1961,7 +1961,6 @@ static int thermal_pm_notify(struct notifier_block *nb,
 static struct notifier_block thermal_pm_nb = {
 	.notifier_call = thermal_pm_notify,
 };
->>>>>>> ff140fe... Thermal: handle thermal zone device properly during system sleep
 
 static int __init thermal_init(void)
 {

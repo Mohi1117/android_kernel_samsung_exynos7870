@@ -1628,7 +1628,7 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
 	pm_runtime_set_autosuspend_delay(&pdev->dev,
 					EXYNOS5_HSI2C_RUNTIME_PM_DELAY);
 	pm_runtime_enable(&pdev->dev);
-
+#endif
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	i2c->regs = devm_ioremap_resource(&pdev->dev, mem);
 	if (i2c->regs == NULL) {
@@ -1814,14 +1814,14 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct exynos5_i2c *i2c = platform_get_drvdata(pdev);
+			int ret = 0;
 
 	i2c_lock_adapter(&i2c->adap);
 	/* I2C for batcher doesn't need reset */
 	if(!(i2c->support_hsi2c_batcher)) {
 		exynos_update_ip_idle_status(i2c->idle_ip_index, 0);
-        int ret = 0;
 
-        ret = clk_prepare_enable(i2c->clk);
+        ret = clk_enable(i2c->clk);
         if (ret)
                 return ret;
 		exynos5_i2c_reset(i2c);

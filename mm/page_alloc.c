@@ -6445,6 +6445,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 		       unsigned int  migratetype)
 {
 	unsigned long outer_start, outer_end;
+	struct zone *zone = page_zone(pfn_to_page(start));
 	unsigned int order;
 	int ret = 0;
 

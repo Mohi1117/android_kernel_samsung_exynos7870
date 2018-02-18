@@ -1618,7 +1618,6 @@ static int dwc3_udc_init(struct dwc3 *dwc)
 	}
 	dwc3_writel(dwc->regs, DWC3_DCFG, reg);
 
-	dwc->start_config_issued = false;
 
 	/* Start with SuperSpeed Default */
 	dwc3_gadget_ep0_desc.wMaxPacketSize = cpu_to_le16(512);
@@ -1784,7 +1783,6 @@ static int dwc3_gadget_vbus_session(struct usb_gadget *g, int is_active)
 		} else {
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 			dwc3_disconnect_gadget(dwc);
-			dwc->start_config_issued = false;
 			dwc->gadget.speed = USB_SPEED_UNKNOWN;
 			dwc->setup_packet_pending = false;
 #endif
@@ -3254,7 +3252,6 @@ void dwc3_gadget_disconnect_proc(struct dwc3 *dwc)
 	if (dwc->gadget_driver && dwc->gadget_driver->disconnect)
 		dwc->gadget_driver->disconnect(&dwc->gadget);
 
-	dwc->start_config_issued = false;
 
 	dwc->gadget.speed = USB_SPEED_UNKNOWN;
 	dwc->setup_packet_pending = false;

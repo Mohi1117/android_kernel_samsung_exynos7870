@@ -1559,8 +1559,8 @@ static void binder_put_node(struct binder_node *node)
 	binder_dec_node_tmpref(node);
 }
 
-static struct binder_ref *binder_get_ref(struct binder_proc *proc,
-					 u32 desc, bool need_strong_ref)
+static struct binder_ref *binder_get_ref_olocked(struct binder_proc *proc,
+						 u32 desc, bool need_strong_ref)
 {
 	struct rb_node *n = proc->refs_by_desc.rb_node;
 	struct binder_ref *ref;
@@ -1568,11 +1568,11 @@ static struct binder_ref *binder_get_ref(struct binder_proc *proc,
 	while (n) {
 		ref = rb_entry(n, struct binder_ref, rb_node_desc);
 
-		if (desc < ref->desc) {
+		if (desc < ref->data.desc) {
 			n = n->rb_left;
-		} else if (desc > ref->desc) {
+		} else if (desc > ref->data.desc) {
 			n = n->rb_right;
-		} else if (need_strong_ref && !ref->strong) {
+		} else if (need_strong_ref && !ref->data.strong) {
 			binder_user_error("tried to use weak ref as strong ref\n");
 			return NULL;
 		} else {
@@ -2758,22 +2758,8 @@ static bool binder_proc_transaction(struct binder_transaction *t,
 	binder_inner_proc_unlock(proc);
 	binder_node_unlock(node);
 
-			if (node == NULL) {
-				pr_err("transaction release %d bad node %016llx\n",
-				       debug_id, (u64)fp->binder);
-				break;
-			}
-			binder_debug(BINDER_DEBUG_TRANSACTION,
-				     "        node %d u%016llx\n",
-				     node->debug_id, (u64)node->ptr);
-			binder_dec_node(node, fp->type == BINDER_TYPE_BINDER, 0);
-		} break;
-		case BINDER_TYPE_HANDLE:
-		case BINDER_TYPE_WEAK_HANDLE: {
-			struct binder_ref *ref;
-
-			ref = binder_get_ref(proc, fp->handle,
-					     fp->type == BINDER_TYPE_HANDLE);
+	return true;
+}
 
 /**
  * binder_get_node_refs_for_txn() - Get required refs on node for txn
@@ -2908,8 +2894,21 @@ static void binder_transaction(struct binder_proc *proc,
 		if (tr->target.handle) {
 			struct binder_ref *ref;
 
-			ref = binder_get_ref(proc, tr->target.handle, true);
-			if (ref == NULL) {
+			/*
+			 * There must already be a strong ref
+			 * on this node. If so, do a strong
+			 * increment on the node to ensure it
+			 * stays alive until the transaction is
+			 * done.
+			 */
+			binder_proc_lock(proc);
+			ref = binder_get_ref_olocked(proc, tr->target.handle,
+						     true);
+			if (ref) {
+				target_node = binder_get_node_refs_for_txn(
+						ref->node, &target_proc,
+						&return_error);
+			} else {
 				binder_user_error("%d:%d got transaction to invalid handle\n",
 					proc->pid, thread->pid);
 				return_error = BR_FAILED_REPLY;
@@ -3139,10 +3138,7 @@ static void binder_transaction(struct binder_proc *proc,
 		} break;
 		case BINDER_TYPE_HANDLE:
 		case BINDER_TYPE_WEAK_HANDLE: {
-			struct binder_ref *ref;
-
-			ref = binder_get_ref(proc, fp->handle,
-					     fp->type == BINDER_TYPE_HANDLE);
+			struct flat_binder_object *fp;
 
 			fp = to_flat_binder_object(hdr);
 			ret = binder_translate_handle(fp, t, thread);
@@ -3419,23 +3415,25 @@ static int binder_thread_write(struct binder_proc *proc,
 				return -EFAULT;
 
 			ptr += sizeof(uint32_t);
-			if (target == 0 && binder_context_mgr_node &&
-			    (cmd == BC_INCREFS || cmd == BC_ACQUIRE)) {
-				ref = binder_get_ref_for_node(proc,
-					       binder_context_mgr_node);
-				if (ref->desc != target) {
-					binder_user_error("%d:%d tried to acquire reference to desc 0, got %d instead\n",
-						proc->pid, thread->pid,
-						ref->desc);
-				}
-			} else
-				ref = binder_get_ref(proc, target,
-						     cmd == BC_ACQUIRE ||
-						     cmd == BC_RELEASE);
-			if (ref == NULL) {
-				binder_user_error("%d:%d refcount change on invalid ref %d\n",
-					proc->pid, thread->pid, target);
-				break;
+			ret = -1;
+			if (increment && !target) {
+				struct binder_node *ctx_mgr_node;
+				mutex_lock(&context->context_mgr_node_lock);
+				ctx_mgr_node = context->binder_context_mgr_node;
+				if (ctx_mgr_node)
+					ret = binder_inc_ref_for_node(
+							proc, ctx_mgr_node,
+							strong, NULL, &rdata);
+				mutex_unlock(&context->context_mgr_node_lock);
+			}
+			if (ret)
+				ret = binder_update_ref_for_handle(
+						proc, target, increment, strong,
+						&rdata);
+			if (!ret && rdata.desc != target) {
+				binder_user_error("%d:%d tried to acquire reference to desc %d, got %d instead\n",
+					proc->pid, thread->pid,
+					target, rdata.desc);
 			}
 			switch (cmd) {
 			case BC_INCREFS:
@@ -3669,7 +3667,29 @@ static int binder_thread_write(struct binder_proc *proc,
 			if (get_user(cookie, (binder_uintptr_t __user *)ptr))
 				return -EFAULT;
 			ptr += sizeof(binder_uintptr_t);
-			ref = binder_get_ref(proc, target, false);
+			if (cmd == BC_REQUEST_DEATH_NOTIFICATION) {
+				/*
+				 * Allocate memory for death notification
+				 * before taking lock
+				 */
+				death = kzalloc(sizeof(*death), GFP_KERNEL);
+				if (death == NULL) {
+					WARN_ON(thread->return_error.cmd !=
+						BR_OK);
+					thread->return_error.cmd = BR_ERROR;
+					binder_enqueue_work(
+						thread->proc,
+						&thread->return_error.work,
+						&thread->todo);
+					binder_debug(
+						BINDER_DEBUG_FAILED_TRANSACTION,
+						"%d:%d BC_REQUEST_DEATH_NOTIFICATION failed\n",
+						proc->pid, thread->pid);
+					break;
+				}
+			}
+			binder_proc_lock(proc);
+			ref = binder_get_ref_olocked(proc, target, false);
 			if (ref == NULL) {
 				binder_user_error("%d:%d %s invalid ref %d\n",
 					proc->pid, thread->pid,

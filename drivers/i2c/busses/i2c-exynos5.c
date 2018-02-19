@@ -1802,7 +1802,6 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct exynos5_i2c *i2c = platform_get_drvdata(pdev);
-			int ret = 0;
 
 	i2c_lock_adapter(&i2c->adap);
 	/* I2C for batcher doesn't need reset */

@@ -29,8 +29,8 @@
  * to static priority [ MAX_RT_PRIO..MAX_PRIO-1 ],
  * and back.
  */
-#define NICE_TO_PRIO(nice)	((nice) + DEFAULT_PRIO)
-#define PRIO_TO_NICE(prio)	((prio) - DEFAULT_PRIO)
+#define NICE_TO_PRIO(nice)	(MAX_RT_PRIO + (nice) + 20)
+#define PRIO_TO_NICE(prio)	((prio) - MAX_RT_PRIO - 20)
 
 /*
  * 'User priority' is the nice value converted to something we

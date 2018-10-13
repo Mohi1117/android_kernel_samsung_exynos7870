@@ -923,15 +923,7 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 		zswap_pool_limit_hit++;
 		ret = -ENOMEM;
 		goto reject;
-		}
-		/* A second zswap_is_full() check after
-		 * zswap_shrink() to make sure it's now
-		 * under the max_pool_percent
-		 */
-		if (zswap_is_full()) {
-			ret = -ENOMEM;
-			goto reject;
-		}
+	}
 
 	/* allocate entry */
 	entry = zswap_entry_cache_alloc(GFP_KERNEL);

@@ -252,6 +252,8 @@ static void nf_ct_add_to_dying_list(struct nf_conn *ct)
 {
 	struct ct_pcpu *pcpu;
 
+    #ifdef CONFIG_KNOX_NCM
+    
 	/* START_OF_KNOX_NPA */
 	/* send dying conntrack entry to collect data */
 	if ( (check_ncm_flag()) && (ct != NULL) && (atomic_read(&ct->startFlow)) ) {
@@ -259,6 +261,8 @@ static void nf_ct_add_to_dying_list(struct nf_conn *ct)
 	}
 	/* END_OF_KNOX_NPA */
 
+    #endif
+    
 	/* add this conntrack to the (per cpu) dying list */
 	ct->cpu = smp_processor_id();
 	pcpu = per_cpu_ptr(nf_ct_net(ct)->ct.pcpu_lists, ct->cpu);

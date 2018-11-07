@@ -651,6 +651,8 @@ out:
 	return ret;
 }
 
+
+
 /* START_OF_KNOX_NPA */
 /** The function sets the domain name associated with the socket. **/
 static int sock_set_domain_name(struct sock *sk, char __user *optval,
@@ -717,6 +719,7 @@ static int sock_set_dns_pid(struct sock *sk, char __user *optval, int optlen)
 		if (copy_from_user(&dns_pid, optval, sizeof(dns_pid)))
 			goto out;
 		memcpy(&sk->knox_dns_pid, &dns_pid, sizeof(sk->knox_dns_pid));
+		#ifdef CONFIG_KNOX_NCM
 		if(check_ncm_flag()) {
 			pid_struct = find_get_pid(dns_pid);
 			if (pid_struct != NULL) {
@@ -731,6 +734,7 @@ static int sock_set_dns_pid(struct sock *sk, char __user *optval, int optlen)
 				}
 			}
 		}
+		#endif
 		ret = 0;
 	}
 
@@ -1502,6 +1506,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 	sk = sk_prot_alloc(prot, priority | __GFP_ZERO, family);
 	if (sk) {
 		sk->sk_family = family;
+		#ifdef CONFIG_KNOX_NCM
 		/* START_OF_KNOX_NPA */
 		/* assign values to members of sock structure when npa flag is present */
 		sk->knox_uid = current->cred->uid.val;
@@ -1545,6 +1550,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 			}
 		}
 		/* END_OF_KNOX_NPA */
+		#endif
 		/*
 		 * See comment in struct sock definition to understand
 		 * why we need sk_prot_creator -acme

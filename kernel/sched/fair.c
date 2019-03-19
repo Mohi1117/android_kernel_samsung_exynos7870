@@ -5982,8 +5982,13 @@ again:
 	if (!cfs_rq->nr_running)
 		goto idle;
 
-	if (prev->sched_class != &fair_sched_class)
-		goto simple;
+	WRITE_ONCE(cfs_rq->h_load_next, NULL);
+	for_each_sched_entity(se) {
+		cfs_rq = cfs_rq_of(se);
+		WRITE_ONCE(cfs_rq->h_load_next, se);
+		if (cfs_rq->last_h_load_update == now)
+			break;
+	}
 
 	/*
 	 * Because of the set_next_buddy() in dequeue_task_fair() it is rather
@@ -5993,29 +5998,10 @@ again:
 	 * hierarchy, only change the part that actually changes.
 	 */
 
-	do {
-		struct sched_entity *curr = cfs_rq->curr;
-
-		/*
-		 * Since we got here without doing put_prev_entity() we also
-		 * have to consider cfs_rq->curr. If it is still a runnable
-		 * entity, update_curr() will update its vruntime, otherwise
-		 * forget we've ever seen it.
-		 */
-		if (curr && curr->on_rq)
-			update_curr(cfs_rq);
-		else
-			curr = NULL;
-
-		/*
-		 * This call to check_cfs_rq_runtime() will do the throttle and
-		 * dequeue its entity in the parent(s). Therefore the 'simple'
-		 * nr_running test will indeed be correct.
-		 */
-		if (unlikely(check_cfs_rq_runtime(cfs_rq)))
-			goto simple;
-
-		se = pick_next_entity(cfs_rq, curr);
+	while ((se = READ_ONCE(cfs_rq->h_load_next)) != NULL) {
+		load = cfs_rq->h_load;
+		load = div64_ul(load * se->avg.load_avg_contrib,
+				cfs_rq->runnable_load_avg + 1);
 		cfs_rq = group_cfs_rq(se);
 	} while (cfs_rq);
 

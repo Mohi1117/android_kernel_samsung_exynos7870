@@ -1,10 +1,17 @@
-dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
-dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
-dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+# SPDX-License-Identifier: GPL-2.0
+dtb-y += exynos7870-j7y17lte_eur_open_00.dtb
+dtb-y += exynos7870-j7y17lte_eur_open_01.dtb
+dtb-y += exynos7870-j7y17lte_eur_open_02.dtb
+dtb-y += exynos7870-j7y17lte_eur_open_03.dtb
+dtb-y += exynos7870-j7y17lte_eur_open_04.dtb
+dtb-y += exynos7870-j7y17lte_eur_open_05.dtb
+dtb-y += exynos7870-j7y17lte_eur_open_06.dtb
+dtb-y += exynos7870-j7y17lte_eur_open_07.dtb
 
 targets += dtbs
-targets += $(dtb-y)
+DTB_LIST  := $(dtb-y) $(dtbo-y)
+always    := $(DTB_LIST)
 
-dtbs: $(addprefix $(obj)/, $(dtb-y))
+dtbs: $(addprefix $(obj)/, $(DTB_LIST))
 
-clean-files := *.dtb
+clean-files := *.dtb*
